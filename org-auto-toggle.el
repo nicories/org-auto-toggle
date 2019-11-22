@@ -2,45 +2,50 @@
 ;;; Commentary:
 
 ;;; Code:
+(require 'org)
 
 (defvar org-auto-toggle/org-last-fragment nil
   "Holds the type and position of last valid fragment we were on. Format: (FRAGMENT_TYPE FRAGMENT_POINT_BEGIN)."
   )
 
-(setq org-auto-toggle/org-valid-fragment-type
-      '(latex-fragment
-        latex-environment
-        link))
+(defvar org-auto-toggle/org-types
+  '(
+    ;; TODO: -> 1 list
+    (code . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil)  (org-restart-font-lock))))
+    (bold . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil) (org-restart-font-lock))))
+    (italic . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil)  (org-restart-font-lock))))
+    (verbatim . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil)  (org-restart-font-lock))))
+    (underline . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil)  (org-restart-font-lock))))
+
+    (entity . ((lambda (begin)  (org-toggle-pretty-entities)) (lambda (begin)  (org-toggle-pretty-entities))))
+
+    (link . ((lambda (begin)  (org-toggle-link-display) (org-remove-inline-images)) (lambda (begin)  (org-toggle-link-display)(org-display-inline-images))))
+    (latex-fragment . ((lambda (begin) (org-preview-latex-fragment)) (lambda (begin) (org-clear-latex-preview begin (+ begin 5)))))
+    (latex-environment . ((lambda (begin) (org-preview-latex-fragment)) (lambda (begin) (org-clear-latex-preview begin (+ begin 5)))))
+    )
+  "Alist of types from (org-element-context) with functions to turn overlay on or off."
+  )
 
 (defun org-auto-toggle/org-curr-fragment ()
   "Return the type and position of the current fragment available for preview inside `org-mode`. Return nil at non-displayable fragments."
   (let* ((fr (org-element-context))
          (fr-type (car fr)))
-    (when (memq fr-type org-auto-toggle/org-valid-fragment-type)
+    (when (not (eq (assoc (nth 0 fr) org-auto-toggle/org-types) nil))
       (list fr-type
             (org-element-property :begin fr))))
   )
 
 (defun org-auto-toggle/org-remove-fragment-overlay (fr)
   "Remove fragment overlay at FR."
-  (org-clear-latex-preview (nth 1 fr) (+ (nth 1 fr) 5))
+  (let ((type (assoc (nth 0 fr) org-auto-toggle/org-types)))
+    (unless (eq type nil) (funcall (nth 1 (cdr type)) (nth 1 fr))))
   )
 
 (defun org-auto-toggle/org-preview-fragment (fr)
   "Preview org fragment at FR."
-  (let ((fr-type (nth 0 fr))
-        (fr-begin (nth 1 fr)))
-    (goto-char fr-begin)
-    (cond ((or (eq 'latex-fragment fr-type) ;; latex stuffs
-               (eq 'latex-environment fr-type))
-           (when (org-auto-toggle/org-curr-fragment) (org-preview-latex-fragment))) ;; only toggle preview when we're in a valid region (for inserting in the front of a fragment)
-
-
-          ((eq 'link fr-type) ;; for images
-           (let ((fr-end (org-element-property :end (org-element-context))))
-             (org-display-inline-images nil t fr-begin fr-end))))
-    ))
-
+  (let ((type (assoc (nth 0 fr) org-auto-toggle/org-types)))
+    (unless (eq type nil) (funcall (nth 0 (cdr type)) (nth 1 fr))))
+  )
 
 (defun org-auto-toggle/org-auto-toggle-fragment-display ()
   "Automatically toggle a displayable org mode fragment."
