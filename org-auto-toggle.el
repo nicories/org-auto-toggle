@@ -98,5 +98,13 @@
            (setq org-auto-toggle/org-last-fragment curr))
 
           ))))
+(define-minor-mode org-auto-toggle-mode
+  "Toggle Fragments automatically."
+  :global t
+  (if org-auto-toggle-mode
+      (add-hook 'post-command-hook 'org-auto-toggle/org-auto-toggle-fragment-display t)
+      (remove-hook 'post-command-hook 'org-auto-toggle/org-auto-toggle-fragment-display t)
+    )
+  )
 (provide 'org-auto-toggle)
 ;;; org-auto-toggle ends here
