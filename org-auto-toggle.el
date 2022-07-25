@@ -3,48 +3,51 @@
 
 ;;; Code:
 (require 'org)
+(require 'org-element)
 
 (defvar org-auto-toggle/org-last-fragment nil
-  "Holds the type and position of last valid fragment we were on. Format: (FRAGMENT_TYPE FRAGMENT_POINT_BEGIN)."
+  "Format: (type begin end)."
   )
 
 (defvar org-auto-toggle/org-types
   '(
     ;; TODO: -> 1 list
-    (code . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil)  (org-restart-font-lock))))
-    (bold . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil) (org-restart-font-lock))))
-    (italic . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil)  (org-restart-font-lock))))
-    (verbatim . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil)  (org-restart-font-lock))))
-    (underline . ((lambda (begin) (setq org-hide-emphasis-markers t) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers nil)  (org-restart-font-lock))))
+    (code . ((lambda (begin) (setq org-hide-emphasis-markers nil) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers t)  (org-restart-font-lock))))
+    (bold . ((lambda (begin) (setq org-hide-emphasis-markers nil) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers t)  (org-restart-font-lock))))
+    (italic . ((lambda (begin) (setq org-hide-emphasis-markers nil) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers t)  (org-restart-font-lock))))
+    (verbatim . ((lambda (begin) (setq org-hide-emphasis-markers nil) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers t)  (org-restart-font-lock))))
+    (underline . ((lambda (begin) (setq org-hide-emphasis-markers nil) (org-restart-font-lock)) (lambda (begin) (setq org-hide-emphasis-markers t)  (org-restart-font-lock))))
 
-    (entity . ((lambda (begin)  (org-toggle-pretty-entities)) (lambda (begin)  (org-toggle-pretty-entities))))
+    (entity . ((lambda (begin)  (if org-pretty-entities(org-toggle-pretty-entities))) (lambda (begin)  (if (not org-pretty-entities)(org-toggle-pretty-entities)))))
 
     (link . ((lambda (begin)  (org-toggle-link-display) (org-remove-inline-images)) (lambda (begin)  (org-toggle-link-display)(org-display-inline-images))))
-    (latex-fragment . ((lambda (begin) (org-preview-latex-fragment)) (lambda (begin) (org-clear-latex-preview begin (+ begin 5)))))
-    (latex-environment . ((lambda (begin) (org-preview-latex-fragment)) (lambda (begin) (org-clear-latex-preview begin (+ begin 5)))))
+    ;; (latex-fragment . ((lambda (begin) (org-preview-latex-fragment)) (lambda (begin) (org-clear-latex-preview begin (+ begin 5)))))
+    (latex-fragment . ( (lambda (begin) (org-clear-latex-preview begin (+ begin 5)))(lambda (begin) (org-latex-preview))))
+    (latex-environment . ( (lambda (begin) (org-clear-latex-preview begin (+ begin 5)))(lambda (begin) (org-latex-preview))))
     )
-  "Alist of types from (org-element-context) with functions to turn overlay on or off."
+  "(type . (remove function) (show function))."
   )
 
 (defun org-auto-toggle/org-curr-fragment ()
-  "Return the type and position of the current fragment available for preview inside `org-mode`. Return nil at non-displayable fragments."
+  "Return the type and position of the current fragment.
+Return nil at non-displayable fragments."
   (let* ((fr (org-element-context))
          (fr-type (car fr)))
     (when (not (eq (assoc (nth 0 fr) org-auto-toggle/org-types) nil))
       (list fr-type
-            (org-element-property :begin fr))))
+            (org-element-property :begin fr)(org-element-property :end fr))))
   )
 
 (defun org-auto-toggle/org-remove-fragment-overlay (fr)
   "Remove fragment overlay at FR."
   (let ((type (assoc (nth 0 fr) org-auto-toggle/org-types)))
-    (unless (eq type nil) (funcall (nth 1 (cdr type)) (nth 1 fr))))
+    (unless (eq type nil) (funcall (nth 0 (cdr type)) (nth 1 fr))))
   )
 
 (defun org-auto-toggle/org-preview-fragment (fr)
   "Preview org fragment at FR."
   (let ((type (assoc (nth 0 fr) org-auto-toggle/org-types)))
-    (unless (eq type nil) (funcall (nth 0 (cdr type)) (nth 1 fr))))
+    (unless (eq type nil) (funcall (nth 1 (cdr type)) (nth 1 fr))))
   )
 
 (defun org-auto-toggle/org-auto-toggle-fragment-display ()
@@ -74,10 +77,9 @@
 
           ;; were on a fragment and now are not on a fragment
           ((and
-            ;; not on a fragment now
-            (not curr)
             ;; but we were on one
-            org-auto-toggle/org-last-fragment)
+            org-auto-toggle/org-last-fragment
+            (not curr))
            ;; put image back on, provided that there is still a fragment here.
            (save-excursion
              (org-auto-toggle/org-preview-fragment org-auto-toggle/org-last-fragment))
@@ -96,7 +98,6 @@
              (org-auto-toggle/org-remove-fragment-overlay curr)
              )
            (setq org-auto-toggle/org-last-fragment curr))
-
           ))))
 (define-minor-mode org-auto-toggle-mode
   "Toggle Fragments automatically."
