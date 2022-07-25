@@ -108,4 +108,4 @@ Return nil at non-displayable fragments."
     )
   )
 (provide 'org-auto-toggle)
-;;; org-auto-toggle ends here
+;;; org-auto-toggle.el ends here
